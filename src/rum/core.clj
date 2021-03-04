@@ -115,11 +115,6 @@
   (-defc 'rum.core/build-defcc &env body))
 
 (defn- build-ctor [render mixins display-name]
-  (let [mixins (->> mixins (mapcat keys) set)]
-    (assert (set/subset? mixins rum.specs/mixins)
-            (str display-name " declares invalid mixin keys "
-                 (set/difference mixins rum.specs/mixins) ", "
-                 "did you mean one of " rum.specs/mixins)))
   (let [init           (collect :init mixins)                ;; state props -> state
         will-mount     (collect* [:will-mount                ;; state -> state
                                   :before-render] mixins)    ;; state -> state

@@ -24,15 +24,6 @@
     (gobj/set obj (name k) (clj->js v))))
 
 (defn- build-class [render mixins display-name]
-  (when ^boolean goog.DEBUG
-    (let [mixins (->> mixins (mapcat keys) set)]
-      (assert (set/subset? mixins rum.specs/mixins)
-              (str display-name " declares invalid mixin keys "
-                   (set/difference mixins rum.specs/mixins) ", "
-                   "did you mean one of " rum.specs/mixins))
-      (->> (select-keys rum.specs/deprecated-mixins mixins)
-           vals
-           (run! #(.warn js/console %)))))
   (let [init           (collect   :init mixins)             ;; state props -> state
         will-mount     (collect [:will-mount] mixins)   ;; state -> state
         before-render  (collect* [:unsafe/will-mount
