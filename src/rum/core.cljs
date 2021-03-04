@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [ref deref])
   (:require-macros rum.core)
   (:require
+   [cljs.core]
    [cljsjs.react]
    [cljsjs.react.dom]
    [goog.object :as gobj]
@@ -325,26 +326,26 @@
 
 (defn local
   "Mixin constructor. Adds an atom to component’s state that can be used to keep stuff during component’s lifecycle. Component will be re-rendered if atom’s value changes. Atom is stored under user-provided key or under `:rum/local` by default.
-  
-   ```
-   (rum/defcs counter < (rum/local 0 :cnt)
-     [state label]
-     (let [*cnt (:cnt state)]
-       [:div {:on-click (fn [_] (swap! *cnt inc))}
-         label @*cnt]))
-   
-   (rum/mount (counter \"Click count: \"))
-   ```"
+
+      ```
+      (rum/defcs counter < (rum/local 0 :cnt)
+        [state label]
+        (let [*cnt (:cnt state)]
+          [:div {:on-click (fn [_] (swap! *cnt inc))}
+            label @*cnt]))
+
+      (rum/mount (counter \"Click count: \"))
+      ```"
   ([initial] (local initial :rum/local))
   ([initial key]
-   {:will-mount
+   {:init
     (fn [state]
-      (let [local-state (atom initial)
-            component   ^js (:rum/react-component state)]
+      (let [local-state (atom initial)]
         (add-watch local-state key
                    (fn [_ _ p n]
-                     (when (not= p n)
-                       (.forceUpdate component))))
+                     (let [component ^js (some-> (gobj/getValueByKeys (:rum/react-component state) "state" ":rum/state") cljs.core/deref :rum/react-component)]
+                       (when (and component (not= p n))
+                         (.forceUpdate component)))))
         (assoc state key local-state)))}))
 
 

@@ -3,9 +3,10 @@
   (:require
    [rum.cursor :as cursor]
    [rum.server-render :as render]
-   [rum.util :refer [collect collect* call-all]]
+   [rum.util :refer [collect collect* call-all into-all]]
    [rum.derived-atom :as derived-atom]
    [daiquiri.compiler :as compiler]
+   [clojure.string :as s]
    [rum.specs]
    [clojure.set :as set])
   (:import
@@ -49,6 +50,12 @@
 
 (defn- -defc [builder env body]
   (let [{:keys [name doc mixins bodies]} (parse-defc body)
+        {mixins' false
+         annotations' true} (group-by (fn [x]
+                                        (and (list? x)
+                                             (s/includes? (str (first x)) "<>"))) mixins)
+        annotation (first annotations')
+        merged-mixins `(into-all (or ~mixins' []) (or (:mixins ~annotation) []))
         cljs? (:ns env)
         render-bodies (if cljs?
                         (map #(compile-body % env) bodies)
@@ -65,8 +72,8 @@
     `(def ~var-sym
        ~@(if doc [doc] [])
        ~(if cljs?
-          `(rum.core/lazy-build ~builder (fn ~@render-bodies) ~mixins ~display-name)
-          `(~builder (fn ~@render-bodies) ~mixins ~display-name)))))
+          `(rum.core/lazy-build ~builder (fn ~@render-bodies) ~merged-mixins ~display-name)
+          `(~builder (fn ~@render-bodies) ~merged-mixins ~display-name)))))
 
 (defmacro defc
   "```

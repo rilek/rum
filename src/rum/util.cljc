@@ -16,3 +16,13 @@
      (apply fn state args))
    state
    fns))
+
+(defn into-all
+  "Like `into` but supports multiple \"from\"s.
+  ~3-5x faster than concat and return vector, not lazy-seq"
+  ([to from       ] (into to from))
+  ([to from & more]
+   (persistent!
+    (reduce (fn [acc in] (reduce conj! acc in))
+            (transient to)
+            (cons from more)))))
