@@ -55,7 +55,18 @@
                                         (and (list? x)
                                              (s/includes? (str (first x)) "<>"))) mixins)
         annotation (first annotations')
-        merged-mixins `(into-all (or ~mixins' []) (or (:mixins ~annotation) []))
+        ;; Inject:
+        ;; - var name
+        ;; - namespace name
+        annotation' (when annotation
+                      (list (first annotation)
+                            (second annotation)
+                            (nth annotation 3 {})
+                            (str name)
+                            (str (:name (:ns env)))))
+        merged-mixins `(into-all (or ~mixins' [])
+                                 (or (:mixins ~annotation')
+                                     []))
         cljs? (:ns env)
         render-bodies (if cljs?
                         (map #(compile-body % env) bodies)
@@ -69,11 +80,14 @@
         var-sym (-> name
                     (vary-meta update :arglists #(or (:arglists %) `(quote ~arglists)))
                     (vary-meta assoc :rum/tag `'js/React.Element))]
-    `(def ~var-sym
-       ~@(if doc [doc] [])
-       ~(if cljs?
-          `(rum.core/lazy-build ~builder (fn ~@render-bodies) ~merged-mixins ~display-name)
-          `(~builder (fn ~@render-bodies) ~merged-mixins ~display-name)))))
+    `(do
+       (def ~var-sym
+         ~@(if doc [doc] [])
+         ~(if cljs?
+            `(rum.core/lazy-build ~builder (fn ~@render-bodies) ~merged-mixins ~display-name)
+            `(~builder (fn ~@render-bodies) ~merged-mixins ~display-name)))
+       ~(when (and cljs? annotation')
+          `((:effect ~annotation'))))))
 
 (defmacro defc
   "```
