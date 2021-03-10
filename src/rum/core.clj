@@ -61,7 +61,7 @@
         annotation' (when annotation
                       (list (first annotation)
                             (second annotation)
-                            (nth annotation 3 {})
+                            (nth annotation 2 {})
                             (str name)
                             (str (:name (:ns env)))))
         merged-mixins `(into-all (or ~mixins' [])
