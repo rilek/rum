@@ -14,6 +14,8 @@
    [rum.util :as util :refer [collect collect* call-all]]
    [rum.derived-atom :as derived-atom]))
 
+(goog-define ^boolean USE_EFFECT? false)
+
 (defn state
   "Given React component, returns Rum state associated with it."
   [comp]

@@ -87,7 +87,11 @@
             `(rum.core/lazy-build ~builder (fn ~@render-bodies) ~merged-mixins ~display-name)
             `(~builder (fn ~@render-bodies) ~merged-mixins ~display-name)))
        ~(when (and cljs? annotation')
-          `((:effect ~annotation'))))))
+          `(when rum.core/USE_EFFECT? ;; <-- On production this will be DCED
+             (when-let [effect-fn# (:effect ~annotation')]
+               (and (fn? effect-fn#)
+                    (effect-fn#))))))))
+
 
 (defmacro defc
   "```
