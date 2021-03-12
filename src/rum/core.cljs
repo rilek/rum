@@ -19,12 +19,12 @@
 (defn state
   "Given React component, returns Rum state associated with it."
   [comp]
-  (gobj/get (.-state comp) ":rum/state"))
+  (aget (.-state comp) ":rum/state"))
 
 (defn- extend! [obj props]
   (doseq [[k v] props
           :when (some? v)]
-    (gobj/set obj (name k) (clj->js v))))
+    (aset obj (name k) (clj->js v))))
 
 (defn- build-class [render mixins display-name]
   (let [init           (collect   :init mixins)             ;; state props -> state
@@ -49,54 +49,54 @@
 
         ctor           (fn [props]
                          (this-as this
-                                  (gobj/set this "state"
+                                  (aset this "state"
                                             #js {":rum/state"
-                                                 (-> (gobj/get props ":rum/initial-state")
+                                                 (-> (aget props ":rum/initial-state")
                                                      (assoc :rum/react-component this)
                                                      (call-all init props)
                                                      volatile!)})
                                   (.call js/React.Component this props)))
         _              (goog/inherits ctor js/React.Component)
-        prototype      (gobj/get ctor "prototype")]
+        prototype      (aget ctor "prototype")]
 
     (when-not (empty? will-mount)
-      (gobj/set prototype "componentWillMount"
+      (aset prototype "componentWillMount"
                 (fn []
                   (this-as this
                            (vswap! (state this) call-all will-mount)))))
 
     (when-not (empty? did-mount)
-      (gobj/set prototype "componentDidMount"
+      (aset prototype "componentDidMount"
                 (fn []
                   (this-as this
                            (vswap! (state this) call-all did-mount)))))
 
-    (gobj/set prototype "componentWillReceiveProps"
+    (aset prototype "componentWillReceiveProps"
               (fn [next-props]
                 (this-as this
                          (let [old-state  @(state this)
                                state      (merge old-state
-                                                 (gobj/get next-props ":rum/initial-state"))
+                                                 (aget next-props ":rum/initial-state"))
                                next-state (reduce #(%2 old-state %1) state did-remount)]
             ;; allocate new volatile so that we can access both old and new states in shouldComponentUpdate
                            (.setState this #js {":rum/state" (volatile! next-state)})))))
 
     (when-not (empty? should-update)
-      (gobj/set prototype "shouldComponentUpdate"
+      (aset prototype "shouldComponentUpdate"
                 (fn [next-props next-state]
                   (this-as this
                            (let [old-state @(state this)
-                                 new-state @(gobj/get next-state ":rum/state")]
+                                 new-state @(aget next-state ":rum/state")]
                              (or (some #(% old-state new-state) should-update) false))))))
 
     (when-not (empty? will-update)
-      (gobj/set prototype "componentWillUpdate"
+      (aset prototype "componentWillUpdate"
                 (fn [_ next-state]
                   (this-as this
-                           (let [new-state (gobj/get next-state ":rum/state")]
+                           (let [new-state (aget next-state ":rum/state")]
                              (vswap! new-state call-all will-update))))))
 
-    (gobj/set prototype "render"
+    (aset prototype "render"
               (fn []
                 (this-as this
                          (let [state (state this)
@@ -105,34 +105,34 @@
                            dom))))
 
     (when-not (empty? did-update)
-      (gobj/set prototype "componentDidUpdate"
+      (aset prototype "componentDidUpdate"
                 (fn [_ _]
                   (this-as this
                            (vswap! (state this) call-all did-update)))))
 
     (when-not (empty? did-catch)
-      (gobj/set prototype "componentDidCatch"
+      (aset prototype "componentDidCatch"
                 (fn [error info]
                   (this-as this
-                           (vswap! (state this) call-all did-catch error {:rum/component-stack (gobj/get info "componentStack")})
+                           (vswap! (state this) call-all did-catch error {:rum/component-stack (aget info "componentStack")})
                            (.forceUpdate this)))))
 
-    (gobj/set prototype "componentWillUnmount"
+    (aset prototype "componentWillUnmount"
               (fn []
                 (this-as this
                          (when-not (empty? will-unmount)
                            (vswap! (state this) call-all will-unmount))
-                         (gobj/set this ":rum/unmounted?" true))))
+                         (aset this ":rum/unmounted?" true))))
 
     (when-not (empty? child-context)
-      (gobj/set prototype "getChildContext"
+      (aset prototype "getChildContext"
                 (fn []
                   (this-as this
                            (let [state @(state this)]
                              (clj->js (transduce (map #(% state)) merge {} child-context)))))))
 
     (extend! prototype class-props)
-    (gobj/set ctor "displayName" display-name)
+    (aset ctor "displayName" display-name)
     (extend! ctor static-props)
     ctor))
 
@@ -329,7 +329,7 @@
       (let [local-state (atom initial)]
         (add-watch local-state key
                    (fn [_ _ p n]
-                     (let [component ^js (some-> (gobj/getValueByKeys (:rum/react-component state) "state" ":rum/state") cljs.core/deref :rum/react-component)]
+                     (let [component ^js (some-> (aget (:rum/react-component state) "state" ":rum/state") cljs.core/deref :rum/react-component)]
                        (when (and component (not= p n))
                          (.forceUpdate component)))))
         (assoc state key local-state)))}))
