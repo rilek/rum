@@ -1,19 +1,47 @@
 (ns ^:no-doc rum.util)
 
-(defn collect [key mixins]
-  (into []
-        (keep (fn [m] (get m key)))
-        mixins))
+(defn collect
+  [key mixins]
+  (let [result (transient [])]
+    (doseq [m mixins]
+      (when-let [elm (get m key)]
+        (conj! result elm)))
+    (persistent! result)))
+
+(defn akeep
+  [afn coll]
+  (let [result (transient [])]
+    (doseq [elm coll]
+      (when-let [nelm (afn elm)]
+        (conj! result nelm)))
+    (persistent! result)))
 
 (defn collect* [keys mixins]
   (into []
-        (mapcat (fn [m] (keep (fn [k] (get m k)) keys)))
+        (mapcat (fn [m]
+                  (akeep
+                   (fn [k] (get m k))
+                   keys)))
         mixins))
 
-(defn call-all [state fns & args]
+(defn call-all-2
+  [state fns]
   (reduce
-   (fn [state fn]
-     (apply fn state args))
+   (fn [state afn] (afn state))
+   state
+   fns))
+
+(defn call-all-3
+  [state fns arg1]
+  (reduce
+   (fn [state afn] (afn state arg1))
+   state
+   fns))
+
+(defn call-all-4
+  [state fns arg1 arg2]
+  (reduce
+   (fn [state afn] (afn state arg1 arg2))
    state
    fns))
 

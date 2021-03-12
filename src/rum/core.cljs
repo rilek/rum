@@ -11,7 +11,7 @@
    [rum.specs]
    [daiquiri.core]
    [rum.cursor :as cursor]
-   [rum.util :as util :refer [collect collect* call-all]]
+   [rum.util :as util :refer [collect collect* call-all-2 call-all-3 call-all-4]]
    [rum.derived-atom :as derived-atom]))
 
 (goog-define ^boolean USE_EFFECT? false)
@@ -53,7 +53,7 @@
                                             #js {":rum/state"
                                                  (-> (aget props ":rum/initial-state")
                                                      (assoc :rum/react-component this)
-                                                     (call-all init props)
+                                                     (call-all-3 init props)
                                                      volatile!)})
                                   (.call js/React.Component this props)))
         _              (goog/inherits ctor js/React.Component)
@@ -63,13 +63,13 @@
       (aset prototype "componentWillMount"
                 (fn []
                   (this-as this
-                           (vswap! (state this) call-all will-mount)))))
+                           (vswap! (state this) call-all-2 will-mount)))))
 
     (when-not (empty? did-mount)
       (aset prototype "componentDidMount"
                 (fn []
                   (this-as this
-                           (vswap! (state this) call-all did-mount)))))
+                           (vswap! (state this) call-all-2 did-mount)))))
 
     (aset prototype "componentWillReceiveProps"
               (fn [next-props]
@@ -78,12 +78,12 @@
                                state      (merge old-state
                                                  (aget next-props ":rum/initial-state"))
                                next-state (reduce #(%2 old-state %1) state did-remount)]
-            ;; allocate new volatile so that we can access both old and new states in shouldComponentUpdate
+                           ;; allocate new volatile so that we can access both old and new states in shouldComponentUpdate
                            (.setState this #js {":rum/state" (volatile! next-state)})))))
 
     (when-not (empty? should-update)
       (aset prototype "shouldComponentUpdate"
-                (fn [next-props next-state]
+                (fn [_next-props next-state]
                   (this-as this
                            (let [old-state @(state this)
                                  new-state @(aget next-state ":rum/state")]
@@ -94,7 +94,7 @@
                 (fn [_ next-state]
                   (this-as this
                            (let [new-state (aget next-state ":rum/state")]
-                             (vswap! new-state call-all will-update))))))
+                             (vswap! new-state call-all-2 will-update))))))
 
     (aset prototype "render"
               (fn []
@@ -108,20 +108,20 @@
       (aset prototype "componentDidUpdate"
                 (fn [_ _]
                   (this-as this
-                           (vswap! (state this) call-all did-update)))))
+                           (vswap! (state this) call-all-2 did-update)))))
 
     (when-not (empty? did-catch)
       (aset prototype "componentDidCatch"
                 (fn [error info]
                   (this-as this
-                           (vswap! (state this) call-all did-catch error {:rum/component-stack (aget info "componentStack")})
+                           (vswap! (state this) call-all-4 did-catch error {:rum/component-stack (aget info "componentStack")})
                            (.forceUpdate this)))))
 
     (aset prototype "componentWillUnmount"
               (fn []
                 (this-as this
                          (when-not (empty? will-unmount)
-                           (vswap! (state this) call-all will-unmount))
+                           (vswap! (state this) call-all-2 will-unmount))
                          (aset this ":rum/unmounted?" true))))
 
     (when-not (empty? child-context)
