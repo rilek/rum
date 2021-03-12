@@ -382,7 +382,7 @@ Here’s a full list of callbacks you can define in a mixin:
   :did-catch            ;; state, err, info ⇒ state
   :did-mount            ;; state            ⇒ state
   :after-render         ;; state            ⇒ state
-  :will-remount         ;; old-state, state ⇒ state
+  :did-remount          ;; old-state, state ⇒ state
   :should-update        ;; old-state, state ⇒ boolean
   :will-update          ;; state            ⇒ state
   :did-update           ;; state            ⇒ state

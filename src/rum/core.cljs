@@ -36,8 +36,7 @@
         wrapped-render (reduce #(%2 %1) render wrap-render)
         did-mount      (collect* [:did-mount                ;; state -> state
                                   :after-render] mixins)    ;; state -> state
-        will-remount    (collect* [:did-remount             ;; state -> state
-                                   :will-remount] mixins)   ;; old-state state -> state
+        did-remount    (collect   :did-remount mixins)      ;; old-state state -> state
         should-update  (collect   :should-update mixins)    ;; old-state state -> boolean
         will-update    (collect [:will-update] mixins)   ;; state -> state
         before-update  (collect* [:unsafe/will-update
@@ -86,7 +85,7 @@
                          (let [old-state  @(state this)
                                state      (merge old-state
                                                  (gobj/get next-props ":rum/initial-state"))
-                               next-state (reduce #(%2 old-state %1) state will-remount)]
+                               next-state (reduce #(%2 old-state %1) state did-remount)]
             ;; allocate new volatile so that we can access both old and new states in shouldComponentUpdate
                            (.setState this #js {":rum/state" (volatile! next-state)})))))
 
