@@ -26,6 +26,7 @@ Rum is a client/server library for HTML UI. In ClojureScript, it works as React 
     - [Custom class properties](#custom-class-properties)
     - [React context](#react-context)
     - [React Hooks](#react-hooks)
+    - [React Fragment](#react-fragment)
   - [Server-side rendering](#server-side-rendering)
 - [Support](#support)
   - [Talks](#talks)
@@ -57,6 +58,7 @@ Rum:
 
 ### Who’s using Rum?
 
+- [Arc Studio](https://www.arcstudiopro.com), collaborative screenwriting app
 - [Cognician](https://www.cognician.com), coaching platform
 - [Attendify](https://attendify.com), mobile app builder
 - [PartsBox.io](https://partsbox.io), inventory management
@@ -74,14 +76,14 @@ Rum:
 - [Breast Predict](https://breast.predict.nhs.uk/), predicting survival after adjuvant treatment for breast cancer
 - [Prostate Predict](https://prostate.predict.nhs.uk/), prognostic model for men newly diagnosed with non-metastatic prostate cancer
 - [Wobaka](https://wobaka.com), CRM system
-- [Icebreaker](https://icebreaker.video/), online events
+- [Gatheround](https://gatheround.com/), online events
 - [Carrot / OpenCompany](https://github.com/open-company/open-company-web), company updates
 - [UXBOX](https://uxbox.io/), the open-source solution for design and prototyping
 - [Takeoff](https://www.takeoff.com), automated grocery fulfillment solution
 
 ## Using Rum
 
-Add to project.clj: `[rum "0.12.3"]`
+Add to project.clj: `[rum "0.12.8"]`
 
 ### API Docs & Articles
 
@@ -627,22 +629,22 @@ There are Rum wrappers for the various React hooks. See doc strings for examples
 
 #### React Fragment
 
-`rum.core/fragment` macro can be used to render multiple components without wrapping element.
+Using `:<>` as the tag in a markup vector creates a React Fragment, allowing you to render multiple components without a wrapping element.
 
 ```clojure
-(rum/fragment
+[:<>
   [:span]
   [:div]
-  [:span])
+  [:span]]
 
 ;; <span></span><div></div><span></span>
 ```
 
 ### Server-side rendering
 
-When used from cljs Rum delegates serizliation to ReactDOM library. If used from clj/cljc, Rum works as a traditional template engine à la Hiccup:
+When used from cljs Rum delegates serialization to ReactDOM library. If used from clj/cljc, Rum works as a traditional template engine à la Hiccup:
 
-1.  Rum’s `project.clj` dependency becomes `[rum "0.12.3" :exclusions [cljsjs/react cljsjs/react-dom]`
+1.  Rum’s `project.clj` dependency becomes `[rum "0.12.8" :exclusions [cljsjs/react cljsjs/react-dom]`
 2.  Import `rum.core` as usual.
 3.  Define components using `rum/defc` or other macros as usual.
 4.  Instead of mounting, call `rum/render-html` to render into a string.
@@ -710,10 +712,10 @@ Server-side components do not have full lifecycle support, but `:init` and `:wil
 
 Rum was build on inspiration from [Quiescent](https://github.com/levand/quiescent), [Om](https://github.com/swannodette/om) and [Reagent](https://github.com/reagent-project/reagent).
 
-All heavy lifting done by [React](http://facebook.github.io/react/), [Ŝablono](https://github.com/r0man/sablono) and [ClojureScript](https://github.com/clojure/clojurescript).
+All heavy lifting done by [React](http://facebook.github.io/react/) and [ClojureScript](https://github.com/clojure/clojurescript).
 
 ## License
 
-Copyright © 2014 Nikita Prokopov
+Copyright © 2014 Nikita Prokopov, 2020 Roman Liutikov
 
 Licensed under Eclipse Public License (see [LICENSE](LICENSE)).

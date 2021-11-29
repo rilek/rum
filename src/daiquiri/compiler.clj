@@ -1,10 +1,15 @@
 (ns daiquiri.compiler
+  (:refer-clojure :exclude [requiring-resolve])
   (:require [daiquiri.normalize :as normalize]
             [daiquiri.util :refer :all]
-            [clojure.set :as set]
-            [cljs.analyzer :as ana]))
+            [clojure.set :as set]))
 
 (def warn-on-interpretation (atom false))
+
+(defn- requiring-resolve [sym]
+  (or (resolve sym)
+      (do (require (-> sym namespace symbol))
+          (resolve sym))))
 
 (defn maybe-warn-on-interpret
   ([env expr]
@@ -14,7 +19,8 @@
      (binding [*out* *err*]
        (let [column (:column env)
              line (:line env)]
-         (println (str "WARNING: interpreting by default at " ana/*cljs-file* ":" line ":" column))
+         (require 'cljs.analyzer)
+         (println (str "WARNING: interpreting by default at " (requiring-resolve 'cljs.analyzer/*cljs-file*) ":" line ":" column))
          (prn expr)
          (when tag
            (println "Inferred tag was:" tag)))))))
@@ -39,7 +45,12 @@
   "Infer the tag of `form` using `env`."
   [env form]
   (when env
-    (let [e (ana/no-warn (ana/analyze env form))
+    (let [*analyzer-warnings* (requiring-resolve 'cljs.analyzer/*cljs-warnings*)
+          ;; We would want to use cljs.analyzer/no-warn here but we can't since
+          ;; it's a macro and won't work with requiring-resolve
+          e (with-bindings* {*analyzer-warnings* (zipmap (keys @*analyzer-warnings*) (repeat false))}
+              (fn []
+                ((requiring-resolve 'cljs.analyzer/analyze) env form)))
           ;; Roman. Propagating Rum's component return tag
           ;; via :rum/tag meta field, because a component
           ;; is generated as a `def` instead of `defn`
@@ -47,16 +58,10 @@
                     (-> e :fn :info :meta :rum/tag second))]
       (if rum-tag
         (normalize-tags rum-tag)
-        (when-let [tags (ana/infer-tag env e)]
+        (when-let [tags ((requiring-resolve 'cljs.analyzer/infer-tag) env e)]
           (normalize-tags tags))))))
 
 (declare to-js to-js-map)
-
-(defn fragment?
-  "Returns true if `tag` is the fragment tag \"*\" or \"<>\", otherwise false."
-  [tag]
-  (or (= (name tag) "*")
-      (= (name tag) "<>")))
 
 (defmulti compile-attr (fn [name value] name))
 
@@ -76,10 +81,17 @@
   (let [value (camel-case-keys value)]
     (if (map? value)
       (to-js-map value)
-      `(daiquiri.interpreter/attributes ~value))))
+      `(daiquiri.interpreter/element-attributes ~value))))
 
 (defmethod compile-attr :default [_ value]
   (to-js value))
+
+(defn wrap-event-handlers
+  "Wrapping on-change handler to work around async rendering queue
+  that causes jumping caret and lost characters in input fields"
+  [attrs]
+  (cond-> attrs
+          (:on-change attrs) (assoc :on-change `(rum.core/mark-sync-update ~(:on-change attrs)))))
 
 (defn compile-attrs
   "Compile a HTML attribute map."
@@ -89,6 +101,7 @@
          (reduce (fn [attrs [name value]]
                    (assoc attrs name (compile-attr name value)))
                  nil)
+         wrap-event-handlers
          html-to-dom-attrs
          to-js-map)))
 
@@ -99,20 +112,20 @@
            (empty-attrs? attrs-2))
       nil
       (empty-attrs? attrs-1)
-      `(daiquiri.interpreter/attributes ~attrs-2)
+      `(daiquiri.interpreter/element-attributes ~attrs-2)
       (empty-attrs? attrs-2)
-      `(daiquiri.interpreter/attributes ~attrs-1)
+      `(daiquiri.interpreter/element-attributes ~attrs-1)
       (and (map? attrs-1)
            (map? attrs-2))
       (normalize/merge-with-class attrs-1 attrs-2)
-      :else `(daiquiri.interpreter/attributes
+      :else `(daiquiri.interpreter/element-attributes
               (daiquiri.normalize/merge-with-class ~attrs-1 ~attrs-2)))))
 
 (defn- compile-tag
   "Replace fragment syntax (`:*` or `:<>`) by 'React.Fragment, otherwise the
   name of the tag"
   [tag]
-  (if (fragment? tag)
+  (if (fragment-tag? tag)
     'daiquiri.core/fragment
     (name tag)))
 
@@ -276,6 +289,10 @@
   "Returns the compilation strategy to use for a given element."
   [[tag attrs & content :as element] env]
   (cond
+    ;; e.g. [:> ...]
+    (= tag :>)
+    ::react-interop
+
     ;; e.g. [:span "foo"]
     (every? literal? element)
     ::all-literal
@@ -315,6 +332,10 @@
           element."
   {:private true}
   element-compile-strategy)
+
+(defmethod compile-element ::react-interop
+  [element env]
+  `(rum.core/adapt-class ~@(rest element)))
 
 (defmethod compile-element ::all-literal
   [element env]
@@ -407,7 +428,7 @@
   [m]
   (if (every? literal? (keys m))
     (js-obj m)
-    `(daiquiri.interpreter/attributes ~m)))
+    `(daiquiri.interpreter/element-attributes ~m)))
 
 (defn- to-js-array
   "Convert a vector into a JavaScript array."

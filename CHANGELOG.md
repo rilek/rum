@@ -1,3 +1,41 @@
+## 0.12.8
+
+### Fixes
+
+- Bringing back async rendering queue to address performance issues in existing clients
+
+## 0.12.7
+
+### Fixes
+
+- Actually fixed broken interpretation of a collection of elements, due to incorrect `fragment-tag?` check #235
+
+## 0.12.6
+
+### Fixes
+
+- Fixed broken interpretation of a collection of elements, due to incorrect `fragment?` check #235
+
+## 0.12.5
+
+### Fixes
+
+- Fixed warnings not being disabled in shadow-cljs @Azzurite
+
+## 0.12.4
+
+### New
+
+- `:did-remount` is now `:will-remount`, the name matches semantics closely
+- Added support for soft-deprecated lifecycle methods prefixed with `UNSAFE`: `:unsafe/will-mount` and `:unsafe/will-update`
+- Added a wrapper for React's `useLayoutEffect` hook: `use-layout-effect!`
+- Added Reagent-like `:>` syntax for interop with React components
+
+### Fixes
+
+- Fixed `fragment` macro not supporting optional attributes
+- Fixed crashing in projects using Rum w/o ClojureScript dependency 
+
 ## 0.12.3
 
 ### Fixes

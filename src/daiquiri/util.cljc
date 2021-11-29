@@ -33,6 +33,12 @@
           kk))
     k))
 
+(defn camel-case-keys* [m]
+  (->> (reduce-kv #(assoc! %1 (camel-case %2) %3)
+                  (transient {})
+                  m)
+       persistent!))
+
 (defn camel-case-keys
   "Recursively transforms all map keys into camel case."
   [m]
@@ -45,6 +51,19 @@
         (map? (:style m))
         (update :style camel-case-keys)))
     m))
+
+(defn fragment-tag?
+  "Returns true if `tag` is the fragment tag \"*\" or \"<>\", otherwise false."
+  [tag]
+  (and (or (keyword? tag)
+           (symbol? tag)
+           (string? tag))
+       (or (= (name tag) "*")
+           (= (name tag) "<>"))))
+
+(defn fragment? [v]
+  (and (vector? v)
+       (fragment-tag? (nth v 0 nil))))
 
 (defn element?
   "Return true if `x` is an HTML element. True when `x` is a vector

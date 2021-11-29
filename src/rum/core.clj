@@ -403,6 +403,10 @@
   ([setup-fn])
   ([setup-fn deps]))
 
+(defn use-layout-effect!
+  ([setup-fn])
+  ([setup-fn deps]))
+
 (defn use-callback
   ([callback] callback)
   ([callback deps] callback))
@@ -447,15 +451,15 @@
 
 (defmacro fragment
   "(rum/fragment [button] [input] ...)"
-  [{:keys [key] :as attrs} & children]
+  [attrs & children]
   (let [[attrs children] (if (map? attrs)
                            [attrs children]
-                           [nil (concat [attrs] children)])]
+                           [nil (into [attrs] children)])]
     (if-not (:ns &env)
       `(list ~@children)
       `(.createElement js/React
                        (.-Fragment js/React)
-                       ~(compiler/compile-attrs attrs)
+                       ~(compiler/to-js attrs)
                        ~@(map #(compiler/compile-html % &env) children)))))
 
 ;; JS components adapter
@@ -477,5 +481,5 @@
                            [attrs children]
                            [nil (cons attrs children)])]
     (if (:ns &env)
-      `(adapt-class-helper ~type ~(compiler/compile-attrs attrs) (cljs.core/array ~@(map #(compiler/compile-html % &env) children)))
+      `(adapt-class-helper ~type ~(compiler/to-js attrs) (cljs.core/array ~@(map #(compiler/compile-html % &env) children)))
       `(JSComponent. (*render-js-component* '~type ~attrs [~@children])))))

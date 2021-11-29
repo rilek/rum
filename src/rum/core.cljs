@@ -18,8 +18,8 @@
 
 (defn state
   "Given React component, returns Rum state associated with it."
-  [comp]
-  (aget (.-state comp) ":rum/state"))
+  [^js/React.Component comp]
+  (gobj/get (.-state comp) ":rum/state"))
 
 (defn- extend! [obj props]
   (doseq [[k v] props
@@ -28,16 +28,19 @@
 
 (defn- build-class [render mixins display-name]
   (let [init           (collect   :init mixins)             ;; state props -> state
-        will-mount     (collect* [:will-mount               ;; state -> state
+        before-render  (collect* [:will-mount
+                                  :unsafe/will-mount
                                   :before-render] mixins)   ;; state -> state
         render         render                               ;; state -> [dom state]
         wrap-render    (collect   :wrap-render mixins)      ;; render-fn -> render-fn
         wrapped-render (reduce #(%2 %1) render wrap-render)
         did-mount      (collect* [:did-mount                ;; state -> state
                                   :after-render] mixins)    ;; state -> state
-        did-remount    (collect   :did-remount mixins)      ;; old-state state -> state
+        will-remount    (collect* [:did-remount             ;; state -> state
+                                   :will-remount] mixins)   ;; old-state state -> state
         should-update  (collect   :should-update mixins)    ;; old-state state -> boolean
-        will-update    (collect* [:will-update              ;; state -> state
+        before-update  (collect* [:unsafe/will-update
+                                  :unsafe/will-update
                                   :before-render] mixins)   ;; state -> state
         did-update     (collect* [:did-update               ;; state -> state
                                   :after-render] mixins)    ;; state -> state
@@ -50,86 +53,86 @@
         ctor           (fn [props]
                          (this-as this
                                   (aset this "state"
-                                            #js {":rum/state"
-                                                 (-> (aget props ":rum/initial-state")
-                                                     (assoc :rum/react-component this)
-                                                     (call-all-3 init props)
-                                                     volatile!)})
+                                        #js {":rum/state"
+                                             (-> (aget props ":rum/initial-state")
+                                                 (assoc :rum/react-component this)
+                                                 (call-all-3 init props)
+                                                 volatile!)})
                                   (.call js/React.Component this props)))
         _              (goog/inherits ctor js/React.Component)
         prototype      (aget ctor "prototype")]
 
-    (when-not (empty? will-mount)
-      (aset prototype "componentWillMount"
+    (when-not (empty? before-render)
+      (gobj/set prototype "UNSAFE_componentWillMount"
                 (fn []
                   (this-as this
-                           (vswap! (state this) call-all-2 will-mount)))))
+                           (vswap! (state this) call-all-2 before-render)))))
 
     (when-not (empty? did-mount)
       (aset prototype "componentDidMount"
-                (fn []
-                  (this-as this
-                           (vswap! (state this) call-all-2 did-mount)))))
+            (fn []
+              (this-as this
+                       (vswap! (state this) call-all-2 did-mount)))))
 
     (aset prototype "componentWillReceiveProps"
-              (fn [next-props]
-                (this-as this
-                         (let [old-state  @(state this)
-                               state      (merge old-state
-                                                 (aget next-props ":rum/initial-state"))
-                               next-state (reduce #(%2 old-state %1) state did-remount)]
-                           ;; allocate new volatile so that we can access both old and new states in shouldComponentUpdate
-                           (.setState this #js {":rum/state" (volatile! next-state)})))))
+          (fn [next-props]
+            (this-as this
+                     (let [old-state  @(state this)
+                           state      (merge old-state
+                                             (gobj/get next-props ":rum/initial-state"))
+                           next-state (reduce #(%2 old-state %1) state will-remount)]
+            ;; allocate new volatile so that we can access both old and new states in shouldComponentUpdate
+                       (.setState ^js/React.Component this #js {":rum/state" (volatile! next-state)})))))
 
     (when-not (empty? should-update)
       (aset prototype "shouldComponentUpdate"
-                (fn [_next-props next-state]
-                  (this-as this
-                           (let [old-state @(state this)
-                                 new-state @(aget next-state ":rum/state")]
-                             (or (some #(% old-state new-state) should-update) false))))))
+            (fn [_next-props next-state]
+              (this-as this
+                       (let [old-state @(state this)
+                             new-state @(aget next-state ":rum/state")]
+                         (or (some #(% old-state new-state) should-update) false))))))
 
-    (when-not (empty? will-update)
-      (aset prototype "componentWillUpdate"
+    (when-not (empty? before-update)
+      (gobj/set prototype "UNSAFE_componentWillUpdate"
                 (fn [_ next-state]
                   (this-as this
                            (let [new-state (aget next-state ":rum/state")]
-                             (vswap! new-state call-all-2 will-update))))))
+                             (vswap! new-state call-all-2 before-update))))))
 
     (aset prototype "render"
-              (fn []
-                (this-as this
-                         (let [state (state this)
-                               [dom next-state] (wrapped-render @state)]
-                           (vreset! state next-state)
-                           dom))))
+          (fn []
+            (this-as this
+                     (let [state (state this)
+                           [dom next-state] (wrapped-render @state)]
+                       (vreset! state next-state)
+                       dom))))
 
     (when-not (empty? did-update)
       (aset prototype "componentDidUpdate"
-                (fn [_ _]
-                  (this-as this
-                           (vswap! (state this) call-all-2 did-update)))))
+            (fn [_ _]
+              (this-as this
+                       (vswap! (state this) call-all-2 did-update)))))
 
     (when-not (empty? did-catch)
       (aset prototype "componentDidCatch"
-                (fn [error info]
-                  (this-as this
-                           (vswap! (state this) call-all-4 did-catch error {:rum/component-stack (aget info "componentStack")})
-                           (.forceUpdate this)))))
+            (fn [error info]
+              (this-as this
+                       (vswap! (state this) call-all-4 did-catch error {:rum/component-stack (gobj/get info "componentStack")})
+                       (.forceUpdate ^js/React.Component this)))))
 
     (aset prototype "componentWillUnmount"
-              (fn []
-                (this-as this
-                         (when-not (empty? will-unmount)
-                           (vswap! (state this) call-all-2 will-unmount))
-                         (aset this ":rum/unmounted?" true))))
+          (fn []
+            (this-as this
+                     (when-not (empty? will-unmount)
+                       (vswap! (state this) call-all-2 will-unmount))
+                     (aset this ":rum/unmounted?" true))))
 
     (when-not (empty? child-context)
       (aset prototype "getChildContext"
-                (fn []
-                  (this-as this
-                           (let [state @(state this)]
-                             (clj->js (transduce (map #(% state)) merge {} child-context)))))))
+            (fn []
+              (this-as this
+                       (let [state @(state this)]
+                         (clj->js (transduce (map #(% state)) merge {} child-context)))))))
 
     (extend! prototype class-props)
     (aset ctor "displayName" display-name)
@@ -137,7 +140,7 @@
     ctor))
 
 (defn- set-meta! [c]
-  (let [f #(let [ctr (c)]
+  (let [f #(let [^js ctr (c)]
              (.apply ctr ctr (js-arguments)))]
     (specify! f IMeta (-meta [_] (meta (c))))
     f))
@@ -207,8 +210,59 @@
   (let [render (fn [state] [(apply render-body (:rum/react-component state) (:rum/args state)) state])]
     (build-ctor render mixins display-name)))
 
-(defn request-render [comp]
-  (.forceUpdate comp))
+;; render queue
+
+
+(def ^:private schedule
+  (or (and (exists? js/window)
+           (or js/window.requestAnimationFrame
+               js/window.webkitRequestAnimationFrame
+               js/window.mozRequestAnimationFrame
+               js/window.msRequestAnimationFrame))
+      #(js/setTimeout % 16)))
+
+(def ^:private batch
+  (or (when (exists? js/ReactNative) js/ReactNative.unstable_batchedUpdates)
+      (when (exists? js/ReactDOM) js/ReactDOM.unstable_batchedUpdates)
+      (fn [f a] (f a))))
+
+(def ^:private empty-queue [])
+(def ^:private render-queue (volatile! empty-queue))
+
+(defn- render-one [comp]
+  (when (and (some? comp) (not (gobj/get comp ":rum/unmounted?")))
+    (.forceUpdate comp)))
+
+(defn- render-all [queue]
+  (run! render-one queue))
+
+(defn- render []
+  (let [queue @render-queue]
+    (vreset! render-queue empty-queue)
+    (batch render-all queue)))
+
+(def ^:private sync-update? (volatile! false))
+
+(defn request-render
+  "Schedules react component to be rendered on next animation frame,
+  unless the requested update happens to be in a sync-update phase."
+  [component]
+  (if @sync-update?
+    (render-one component)
+    (do
+      (when (empty? @render-queue)
+        (schedule render))
+      (vswap! render-queue conj component))))
+
+;; exporting to work around circular deps
+(defn ^:export mark-sync-update [f]
+  (if (fn? f)
+    (fn wrapped-handler [e]
+      (let [_ (vreset! sync-update? true)
+            ret (f e)
+            _ (vreset! sync-update? false)]
+        ret))
+    f))
 
 (defn mount
   "Add element to the DOM tree. Idempotent. Subsequent mounts will just update element."
@@ -326,12 +380,12 @@
   ([initial key]
    {:init
     (fn [state]
-      (let [local-state (atom initial)]
+      (let [local-state (atom initial)
+            ^js/React.Component component (:rum/react-component state)]
         (add-watch local-state key
                    (fn [_ _ p n]
-                     (let [component ^js (some-> (aget (:rum/react-component state) "state" ":rum/state") cljs.core/deref :rum/react-component)]
-                       (when (and component (not= p n))
-                         (.forceUpdate component)))))
+                     (when (not= p n)
+                       (request-render component))))
         (assoc state key local-state)))}))
 
 
@@ -372,7 +426,7 @@
                (add-watch ref key
                           (fn [_ _ p n]
                             (when (not= p n)
-                              (.forceUpdate comp))))))
+                              (request-render comp))))))
            [dom (assoc next-state :rum.reactive/refs new-reactions)]))))
    :will-unmount
    (fn [state]
@@ -519,6 +573,21 @@
    (->> (if (array? deps) deps (into-array deps))
         (.useEffect js/React #(or (setup-fn) js/undefined)))))
 
+(defn use-layout-effect!
+  "(rum/use-layout-effect!
+    (fn []
+      (.addEventListener js/window \"load\" handler)
+      #(.removeEventListener js/window \"load\" handler))
+    []) ;; empty deps collection instructs React to run setup-fn only once on initial render
+        ;; and cleanup-fn only once before unmounting
+
+  Read more at https://reactjs.org/docs/hooks-effect.html"
+  ([setup-fn]
+   (.useLayoutEffect js/React #(or (setup-fn) js/undefined)))
+  ([setup-fn deps]
+   (->> (if (array? deps) deps (into-array deps))
+        (.useLayoutEffect js/React #(or (setup-fn) js/undefined)))))
+
 (defn use-callback
   "Takes callback function and returns memoized variant, memoization is done based on provided deps collection.
 
@@ -584,7 +653,7 @@
   ([element opts]
    (if-not (identical? *target* "nodejs")
      (.renderToString js/ReactDOMServer element)
-     (let [react-dom-server (js/require "react-dom/server")]
+     (let [^js/ReactDOMServer react-dom-server (js/require "react-dom/server")]
        (.renderToString react-dom-server element)))))
 
 (defn render-static-markup
@@ -593,7 +662,7 @@
   [src]
   (if-not (identical? *target* "nodejs")
     (.renderToStaticMarkup js/ReactDOMServer src)
-    (let [react-dom-server (js/require "react-dom/server")]
+    (let [^js/ReactDOMServer react-dom-server (js/require "react-dom/server")]
       (.renderToStaticMarkup react-dom-server src))))
 
 ;; JS components adapter
