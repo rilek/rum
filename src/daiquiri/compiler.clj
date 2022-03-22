@@ -2,7 +2,8 @@
   (:refer-clojure :exclude [requiring-resolve])
   (:require [daiquiri.normalize :as normalize]
             [daiquiri.util :refer :all]
-            [clojure.set :as set]))
+            [clojure.set :as set]
+            cljs.analyzer))
 
 (def warn-on-interpretation (atom false))
 
@@ -10,6 +11,15 @@
   (or (resolve sym)
       (do (require (-> sym namespace symbol))
           (resolve sym))))
+
+(defn- form-name
+  "Get the name of the supplied form."
+  [form]
+  (when (and (seq? form) (symbol? (first form)))
+    (str
+     (when-let [n (namespace (first form))]
+       (str n "/"))
+     (name (first form)))))
 
 (defn maybe-warn-on-interpret
   ([env expr]
@@ -20,7 +30,7 @@
        (let [column (:column env)
              line (:line env)]
          (require 'cljs.analyzer)
-         (println (str "WARNING: interpreting by default at " (requiring-resolve 'cljs.analyzer/*cljs-file*) ":" line ":" column))
+         (println (str "WARNING: interpreting by default at " cljs.analyzer/*cljs-file* ":" line ":" column))
          (prn expr)
          (when tag
            (println "Inferred tag was:" tag)))))))
@@ -161,17 +171,10 @@
         (maybe-warn-on-interpret &env expr tag)
         `(daiquiri.interpreter/interpret ~expr)))))
 
-(defn- form-name
-  "Get the name of the supplied form."
-  [form]
-  (if (and (seq? form) (symbol? (first form)))
-    (name (first form))))
-
 (declare compile-html)
 
 (defmulti compile-form
   "Pre-compile certain standard forms, where possible."
-  {:private true}
   (fn [form env] (form-name form)))
 
 (defmethod compile-form "case"
@@ -232,6 +235,10 @@
   [[_ bindings & body] env]
   `(if-some ~bindings ~@(doall (for [x body] (compile-html x env)))))
 
+(defmethod compile-form "if-let"
+  [[_ bindings & body] env]
+  `(if-let ~bindings ~@(doall (for [x body] (compile-html x env)))))
+
 (defmethod compile-form "when"
   [[_ bindings & body] env]
   `(when ~bindings ~@(doall (for [x body] (compile-html x env)))))
@@ -243,6 +250,10 @@
 (defmethod compile-form "when-some"
   [[_ bindings & body] env]
   `(when-some ~bindings ~@(butlast body) ~(compile-html (last body) env)))
+
+(defmethod compile-form "when-let"
+  [[_ bindings & body] env]
+  `(when-let ~bindings ~@(butlast body) ~(compile-html (last body) env)))
 
 (defmethod compile-form :default
   [expr env]
